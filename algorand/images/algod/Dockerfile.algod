@@ -1,0 +1,55 @@
+FROM golang:1.14-alpine
+
+ARG CHANNEL=nightly
+ARG URL=
+ARG BRANCH=
+ARG SHA=
+
+# When these are set attempt to connect to a network.
+ARG GENESIS_FILE=""
+ARG BOOTSTRAP_URL=""
+
+# Options for algod config
+ARG ALGOD_PORT=""
+ARG KMD_PORT=""
+ARG TOKEN=""
+ARG TEMPLATE="/tmp/future_template.json"
+
+RUN echo "Installing from source. ${URL} -- ${BRANCH}"
+ENV BIN_DIR="$HOME/node"
+ENV ALGORAND_DATA="/opt/data"
+
+
+# Basic dependencies.
+ENV HOME /opt
+RUN apk update && apk add bash util-linux curl git coreutils python3
+
+# Copy lots of things into the container. The gitignore indicates which directories.
+COPY . /tmp
+
+# Install algod binaries.
+RUN /tmp/install.sh \
+    -d "${BIN_DIR}" \
+    -c "${CHANNEL}" \
+    -u "${URL}" \
+    -b "${BRANCH}" \
+    -s "${SHA}"
+
+# Configure network
+RUN /tmp/setup.py \
+ --bin-dir "$BIN_DIR" \
+ --data-dir "/opt/data" \
+ --start-script "/opt/start_algod.sh" \
+ --network-dir "/opt/testnetwork" \
+ --network-template "${TEMPLATE}" \
+ --network-token "${TOKEN}" \
+ --algod-port "${ALGOD_PORT}" \
+ --kmd-port "${KMD_PORT}" \
+ --bootstrap-url "${BOOTSTRAP_URL}" \
+ --genesis-file "/tmp/${GENESIS_FILE}"
+
+ENV PATH="$BIN_DIR:${PATH}"
+WORKDIR /opt/data
+
+# Start algod
+CMD ["/opt/start_algod.sh"]

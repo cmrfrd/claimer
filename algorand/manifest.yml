@@ -1,0 +1,62 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+ name: algorand-claimer
+spec:
+ template:
+   metadata:
+     name: algorand-claimer
+   spec:
+     restartPolicy: "Never"
+     containers:
+     - name: algod
+       image: algorand-algod:latest
+       ports:
+       - containerPort: ${ALGOD_PORT}
+         protocol: TCP
+         name: algod
+       - containerPort: ${KMD_PORT}
+         protocol: TCP
+         name: kmd
+       volumeMounts:
+       - mountPath: /opt/data
+         name: host-mount
+     - name: algorand-claimer
+       image: algorand-claimer:latest
+       env:
+         - name: ALGORAND_CLAIMER_HOST
+           value: "${ALGORAND_CLAIMER_HOST}"
+         - name: ALGORAND_CLAIMER_ALGOD_PORT
+           value: "${ALGORAND_CLAIMER_ALGOD_PORT}"
+         - name: ALGORAND_CLAIMER_ALGOD_TOKEN
+           value: "${TOKEN}"
+         - name: ALGORAND_CLAIMER_KMD_PORT
+           value: "${ALGORAND_CLAIMER_KMD_PORT}"
+         - name: ALGORAND_CLAIMER_KMD_TOKEN
+           value: "${TOKEN}"
+         - name: ALGORAND_CLAIMER_MIN_CLAIM_AMOUNT
+           value: "${ALGORAND_CLAIMER_MIN_CLAIM_AMOUNT}"
+         - name: ALGORAND_CLAIMER_PASSPHRASE
+           valueFrom:
+             secretKeyRef:
+               name: algorand-claimer-secret
+               key: passphrase
+         - name: ALGORAND_CLAIMER_MNEMONIC
+           valueFrom:
+             secretKeyRef:
+               name: algorand-claimer-secret
+               key: mnemonic
+     volumes:
+     - name: host-mount
+       hostPath:
+         path: ${ALGORAND_DATA}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: algorand-claimer-secret
+type: Opaque
+data:
+  mneumonic: ${ALGORAND_MNEUMONIC}
+  passphrase: ${ALGORAND_CLAIMER_PASSPHRASE}

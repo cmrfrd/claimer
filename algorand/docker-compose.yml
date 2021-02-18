@@ -1,0 +1,24 @@
+version: '3'
+services:
+  algorand-claimer:
+    image: algorand-claimer:latest
+    build:
+      context: .
+      dockerfile: images/algorand-claimer/Dockerfile.algorand-claimer
+    volumes:
+      $(pwd)/data:/opt/data
+  algod:
+    image: algorand-algod:latest
+    build:
+      context: images/algod/
+      dockerfile: Dockerfile.algod
+      args:
+        CHANNEL: "${ALGOD_CHANNEL}"
+        URL: "${ALGOD_URL}"
+        BRANCH: "${ALGOD_BRANCH}"
+        SHA: "${ALGOD_SHA}"
+        BOOTSTRAP_URL: "${NETWORK_BOOTSTRAP_URL}"
+        GENESIS_FILE: "${NETWORK_GENESIS_FILE}"
+        TOKEN: ${TOKEN}
+        ALGOD_PORT: "${ALGOD_PORT}"
+        KMD_PORT: "${KMD_PORT}"
