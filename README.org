@@ -1,0 +1,139 @@
+* Claimer
+
+  This repo sets up a daemons to claim rewards from POS cryptocurrencies.
+
+  This is beneficial as the more we claim, the more is staked, the more it
+  rewarded.
+
+  Usually claiming rewards requires a 0 transaction 'commiting' your funds.
+
+  This repo is a method to automate the creation of the 0 transaction.
+
+  Although these 0 transactions cost a little fee, it is worth it in the long
+  run in terms of compound interest.
+
+  Dependencies:
+
+  systemd
+  docker
+  docker-compose
+  k3d
+  direnv
+
+** Method
+
+   This is the following workflow for claiming rewards
+
+   1. Create claim entry in a config file
+
+      #+begin_example
+      claimers:
+      - name: "claimer 1"
+        image_build_dir: "./build"
+        manifest_file: "manifest.yml"
+        timer_args:
+          OnCalendar: "*-*-* 8:00:00"
+          Group: "users"
+        claimer_args:
+          min_amount: 2
+      #+end_example
+
+   2. Run `make timers` or something similar
+
+      1) Create utlity images in docker-compose-utilities.yml
+
+         - config-merge
+
+   3. Build docker images from docker-compose in ~image_build_dir~
+
+   4. Setup systemd timer
+
+      1) Convert 'timer_args' into toml
+
+      2) Merge toml into template timer
+
+      3) activate timer
+
+      When the timer gets executed
+
+      1) Check for associated images, if they don't exist, build them
+
+      2) Launch k3d cluster
+
+      3) Load associated images
+
+      4) Load environment variables and use config-merge on manifest.yml
+
+      5) Apply manifest.yml in k3d cluster
+
+         - Start node
+
+         - Sync node
+
+           Load data from hard drive
+
+           goal node catchup $(curl https://algorand-catchpoints.s3.us-east-2.amazonaws.com/channel/mainnet/latest.catchpoint)
+
+           sync
+
+         - Start claim script
+
+           - Wait for node to be ready
+
+
+           - Create account
+
+             goal wallet bluh bluh
+             goal account bluh bluh
+
+           - Send commit transaction
+
+             goal clerk send fromAddr toAddr
+
+             account = $(goal account list | grep Unnamed-1 | awk '{ print $3 }')
+             goal clerk send -a 0 --from $account --to $account
+
+           - Wait for transaction to confirm
+
+           - shut down node
+
+           - exit
+
+      6) Return error code if successful
+
+      7) Teardown cluster
+
+* Algorand
+
+  https://www.algorand.com/resources/blog/rewards-technical-overview
+
+** Variables to pass in
+
+   - ALGOD_PORT
+   - KMD_PORT
+   - HOST
+   - ALGORAND_MNEUMONIC
+   - ALGORAND_PASSPHRASE
+
+docker-compose -f docker-compose.yml build
+k3d registry create ephemeral.registry.localhost -p 5000
+k3d cluster create \
+  --no-lb \
+  --k3s-server-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
+  --k3s-server-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%' \
+  --registry-use k3d-ephemeral.registry.localhost
+  # --registry-config (pwd)/registries.yaml
+  # --volume (pwd)/registries.yaml:/etc/rancher/k3s/registries.yaml
+k3d registry delete k3d-ephemeral.registry.localhost
+k3d cluster delete
+
+KUBECONFIG=(k3d kubeconfig write) kubectl run --image k3d-ephemeral.registry.localhost:5000/algorand-algod testimage5 --command -- tail -f /dev/null
+
+
+# k3d cluster create \
+#   --k3s-agent-arg '--docker' \
+#   --k3s-server-arg '--docker' \
+#   --k3s-server-arg '--flannel-backend=none' \
+#   --volume /var/run/docker.sock:/var/run/docker.sock \
+#   --volume (pwd)/calico.yaml:/var/lib/rancher/k3s/server/manifests/calico.yaml
+# kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
