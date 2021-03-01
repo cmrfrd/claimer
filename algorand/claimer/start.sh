@@ -27,24 +27,24 @@ function err () {
 
 function shutdown_node {
   curl \
-    -sb \
     -X POST \
-    -H "Accept: application/json" \
     -H "X-Algo-API-Token: ${ALGORAND_CLAIMER_ALGOD_TOKEN}" \
-    http://localhost:${ALGORAND_CLAIMER_ALGOD_PORT}/v2/shutdown
+    http://localhost:${SHUTDOWN_PORT}
 }
 
 # The developers recoommend just to look at sync time for full sync
 # https://developer.algorand.org/docs/run-a-node/operations/catchup/
 function is_node_synced {
   curl \
-    -sb \
+    -q \
     -H "Accept: application/json" \
     -H "X-Algo-API-Token: ${ALGORAND_CLAIMER_ALGOD_TOKEN}" \
     http://localhost:${ALGORAND_CLAIMER_ALGOD_PORT}/v2/status | \
-  jq '."catchup-time"' |\
-  [ "$(</dev/stdin)" = "0" ]
+    jq -e '."catchup-time" == 0' > /dev/null
 }
+
+echo "Waiting for algod ..."
+timeout 22 sh -c 'until nc -z $0 $1; do sleep 1; done' localhost ${ALGORAND_CLAIMER_ALGOD_PORT}
 
 statusline "Waiting for node to be synced ... (っ•́｡•́)♪♬"
 counter=0
@@ -53,14 +53,18 @@ sleep_seconds=15
 until [ "$(is_node_synced ; echo $?)" -eq "0" ]
 do
    sleep $sleep_seconds
-   [[ counter -eq $max_retry ]] && err_noexit "Failed to sync node, exiting ..." && exit 0
+   if [[ counter -eq $max_retry ]]
+   then
+      err_noexit "Failed to sync node, exiting ..."
+      exit 0
+   fi
    statusline "Node not fully synced - $(($max_retry-$counter)) attempts left ..."
    ((counter++))
 done
 statusline "Node synced!"
 
 statusline "Executing claimer ..."
-./algorand-claimer
+/algorand-claimer
 statusline "Claimer completed ..."
 
 statusline "Shutting down algod node ..."

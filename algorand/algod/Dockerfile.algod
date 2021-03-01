@@ -3,7 +3,8 @@ FROM golang:1.14-alpine
 # Basic dependencies.
 ENV HOME /opt/node
 RUN apk update && \
-    apk add bash util-linux curl git coreutils python3 gcompat tini supervisor jq --no-cache && \
+    apk add bash util-linux curl git coreutils python3 py3-pip gcompat tini supervisor jq --no-cache && \
+    pip install --upgrade pip bottle setuptools && \
     rm -f /var/cache/apk/*
 
 ARG CHANNEL=nightly
@@ -28,7 +29,8 @@ ENV ALGORAND_DATA=$ALGORAND_DATA
 
 ## Add claimer unpriv user
 RUN addgroup -g 1000 -S algod && \
-    adduser -u 1000 -S algod -G algod
+    adduser -u 1000 -S algod -G algod && \
+    chown algod:algod -R /opt/node
 
 ## User newly created system user
 USER algod

@@ -26,4 +26,5 @@ USER claimer
 
 ## Run
 ENTRYPOINT [ "/sbin/tini", "--" ]
-CMD [ "sh", "-c", "start.sh" ]
+CMD [ "sh", "-c", "/start.sh" ]
+# CMD [ "sh", "-c", "sleep 3600" ]

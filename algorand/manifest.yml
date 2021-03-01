@@ -27,18 +27,23 @@ spec:
      containers:
      - name: algod
        image: algorand-algod:${VERSION}
-       livenessProbe:
-         exec:
-           command:
-             - goal node status
-         initialDelaySeconds: 15
-         timeoutSeconds: 1
+       env:
+         - name: CATCHPOINT_BLOCK_DRIFT_THRESHOLD
+           value: "${CATCHPOINT_BLOCK_DRIFT_THRESHOLD}"
+         - name: ALGORAND_CLAIMER_ALGOD_PORT
+           value: "${ALGORAND_CLAIMER_ALGOD_PORT}"
+         - name: ALGORAND_CLAIMER_ALGOD_TOKEN
+           value: "${ALGORAND_CLAIMER_ALGOD_TOKEN}"
+         - name: SHUTDOWN_PORT
+           value: "${SHUTDOWN_PORT}"
        volumeMounts:
        - mountPath: ${ALGORAND_DATA_CONTAINER_MOUNT}
          name: host-mount
      - name: claimer
        image: algorand-claimer:${VERSION}
        env:
+         - name: SHUTDOWN_PORT
+           value: "${SHUTDOWN_PORT}"
          - name: ALGORAND_CLAIMER_HOST
            value: "${ALGORAND_CLAIMER_HOST}"
          - name: ALGORAND_CLAIMER_ALGOD_PORT
@@ -51,6 +56,8 @@ spec:
            value: "${TOKEN}"
          - name: ALGORAND_CLAIMER_MIN_CLAIM_AMOUNT
            value: "${ALGORAND_CLAIMER_MIN_CLAIM_AMOUNT}"
+         - name: ALGORAND_CLAIMER_WALLET_NAME
+           value: "${ALGORAND_CLAIMER_WALLET_NAME}"
          - name: ALGORAND_CLAIMER_PASSPHRASE
            valueFrom:
              secretKeyRef:
