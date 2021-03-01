@@ -1,29 +1,43 @@
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "algorand"
+  labels:
+    name: "algorand"
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
- name: algorand-claimer
+ name: algorand-claimer-algod
+ namespace: algorand
 spec:
  template:
    metadata:
      name: algorand-claimer
    spec:
      restartPolicy: "Never"
+     initContainers:
+     - name: volume-permissions
+       image: busybox
+       command: ['sh', '-c', 'chown -R 1000:1000 ${ALGORAND_DATA_CONTAINER_MOUNT}']
+       volumeMounts:
+       - mountPath: ${ALGORAND_DATA_CONTAINER_MOUNT}
+         name: host-mount
      containers:
      - name: algod
-       image: algorand-algod:latest
-       ports:
-       - containerPort: ${ALGOD_PORT}
-         protocol: TCP
-         name: algod
-       - containerPort: ${KMD_PORT}
-         protocol: TCP
-         name: kmd
+       image: algorand-algod:${VERSION}
+       livenessProbe:
+         exec:
+           command:
+             - goal node status
+         initialDelaySeconds: 15
+         timeoutSeconds: 1
        volumeMounts:
-       - mountPath: /opt/data
+       - mountPath: ${ALGORAND_DATA_CONTAINER_MOUNT}
          name: host-mount
-     - name: algorand-claimer
-       image: algorand-claimer:latest
+     - name: claimer
+       image: algorand-claimer:${VERSION}
        env:
          - name: ALGORAND_CLAIMER_HOST
            value: "${ALGORAND_CLAIMER_HOST}"
@@ -50,13 +64,16 @@ spec:
      volumes:
      - name: host-mount
        hostPath:
-         path: ${ALGORAND_DATA}
+         path: ${ALGORAND_DATA_HOST_MOUNT}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: algorand-claimer-secret
+  namespace: algorand
 type: Opaque
 data:
-  mneumonic: ${ALGORAND_MNEUMONIC}
-  passphrase: ${ALGORAND_CLAIMER_PASSPHRASE}
+  mnemonic: |
+    ${ALGORAND_MNEUMONIC}
+  passphrase: |
+    ${ALGORAND_CLAIMER_PASSPHRASE}

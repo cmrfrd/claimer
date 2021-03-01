@@ -1,16 +1,9 @@
 version: '3'
 services:
-  algorand-claimer:
-    image: algorand-claimer:latest
+  algorand-algod:
+    image: algorand-algod:${VERSION}
     build:
-      context: .
-      dockerfile: images/algorand-claimer/Dockerfile.algorand-claimer
-    volumes:
-      $(pwd)/data:/opt/data
-  algod:
-    image: algorand-algod:latest
-    build:
-      context: images/algod/
+      context: algod
       dockerfile: Dockerfile.algod
       args:
         CHANNEL: "${ALGOD_CHANNEL}"
@@ -22,3 +15,9 @@ services:
         TOKEN: ${TOKEN}
         ALGOD_PORT: "${ALGOD_PORT}"
         KMD_PORT: "${KMD_PORT}"
+        ALGORAND_DATA: "${ALGORAND_DATA_CONTAINER_MOUNT}"
+  algorand-claimer:
+    image: algorand-claimer:${VERSION}
+    build:
+      context: claimer
+      dockerfile: Dockerfile.claimer

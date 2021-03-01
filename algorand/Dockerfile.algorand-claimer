@@ -1,0 +1,27 @@
+ARG VERSION
+FROM algorand-algod:$VERSION as algod
+
+FROM golang:1.14-alpine as builder
+
+ENV GO111MODULE=on
+ADD algorand-claimer /algorand-claimer
+WORKDIR /algorand-claimer
+RUN go build
+
+FROM golang:1.14-alpine
+
+RUN apk update && \
+    apk add --no-cache tini curl && \
+    rm -f /var/cache/apk/*
+
+## copy utils from algod
+COPY --from=algod /node/goal /usr/local/bin/goal
+RUN chmod +x /usr/local/bin/goal
+
+## setup claimer
+COPY --from=builder /algorand-claimer/algorand-claimer /
+COPY algorand-claimer/sync_node.sh /
+RUN chmod +x /sync_node.sh /algorand-claimer
+WORKDIR /
+CMD [ "sleep", "3600" ]
+# CMD [ "sh", "-c", "./sync_node.sh && ./algorand-claimer" ]

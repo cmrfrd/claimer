@@ -25,29 +25,31 @@ function err () {
   exit 1
 }
 
+function shutdown_node {
+  curl \
+    -sb \
+    -X POST \
+    -H "Accept: application/json" \
+    -H "X-Algo-API-Token: ${ALGORAND_CLAIMER_ALGOD_TOKEN}" \
+    http://localhost:${ALGORAND_CLAIMER_ALGOD_PORT}/v2/shutdown
+}
+
 # The developers recoommend just to look at sync time for full sync
 # https://developer.algorand.org/docs/run-a-node/operations/catchup/
 function is_node_synced {
-  goal node status   |\
-    grep "Sync Time"   |\
-    awk '{ print $3 }' |\
-    [ "$(</dev/stdin)" = "0.0s" ]
+  curl \
+    -sb \
+    -H "Accept: application/json" \
+    -H "X-Algo-API-Token: ${ALGORAND_CLAIMER_ALGOD_TOKEN}" \
+    http://localhost:${ALGORAND_CLAIMER_ALGOD_PORT}/v2/status | \
+  jq '."catchup-time"' |\
+  [ "$(</dev/stdin)" = "0" ]
 }
 
-statusline "Doing a little setup check ..."
-[[ -z "$ALGORAND_PASSPHRASE" ]] && echo "Environment variable ALGORAND_PASSPHRASE not defined or empty, exiting ..."
-
-statusline "Ensuring connection to algorand node ...  (っ•́｡•́)♪♬"
-goal node wait
-statusline "Connection success!"
-
-statusline "Catching up node to latest catchpoint ..."
-goal node catchup $(curl https://algorand-catchpoints.s3.us-east-2.amazonaws.com/channel/mainnet/latest.catchpoint)
-
-statusline "Waiting for node to be synced ..."
+statusline "Waiting for node to be synced ... (っ•́｡•́)♪♬"
 counter=0
-max_retry=1
-sleep_seconds=10
+max_retry=240
+sleep_seconds=15
 until [ "$(is_node_synced ; echo $?)" -eq "0" ]
 do
    sleep $sleep_seconds
@@ -55,3 +57,12 @@ do
    statusline "Node not fully synced - $(($max_retry-$counter)) attempts left ..."
    ((counter++))
 done
+statusline "Node synced!"
+
+statusline "Executing claimer ..."
+./algorand-claimer
+statusline "Claimer completed ..."
+
+statusline "Shutting down algod node ..."
+shutdown_node
+statusline "Node shut down, exiting ..."

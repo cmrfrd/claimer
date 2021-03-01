@@ -1,0 +1,66 @@
+FROM golang:1.14-alpine
+
+# Basic dependencies.
+ENV HOME /opt/node
+RUN apk update && \
+    apk add bash util-linux curl git coreutils python3 gcompat tini supervisor jq --no-cache && \
+    rm -f /var/cache/apk/*
+
+ARG CHANNEL=nightly
+ARG URL=
+ARG BRANCH=
+ARG SHA=
+
+# When these are set attempt to connect to a network.
+ARG GENESIS_FILE=""
+ARG BOOTSTRAP_URL=""
+
+# Options for algod config
+ARG ALGOD_PORT=""
+ARG KMD_PORT=""
+ARG TOKEN=""
+ARG TEMPLATE="/tmp/future_template.json"
+ARG ALGORAND_DATA=""
+
+RUN echo "Installing from source. ${URL} -- ${BRANCH}"
+ENV BIN_DIR="/opt/node/bin"
+ENV ALGORAND_DATA=$ALGORAND_DATA
+
+## Add claimer unpriv user
+RUN addgroup -g 1000 -S algod && \
+    adduser -u 1000 -S algod -G algod
+
+## User newly created system user
+USER algod
+
+# Copy lots of things into the container. The gitignore indicates which directories.
+COPY --chown=algod:algod algod-conf/ /opt/node
+
+# Install algod binaries.
+RUN /opt/node/install.sh \
+    -d "${BIN_DIR}" \
+    -c "${CHANNEL}" \
+    -u "${URL}" \
+    -b "${BRANCH}" \
+    -s "${SHA}"
+
+# Configure network
+RUN /opt/node/setup.py \
+ --bin-dir "$BIN_DIR" \
+ --data-dir "${ALGORAND_DATA}" \
+ --start-script "/opt/node/start_algod.sh" \
+ --network-dir "/opt/node/network" \
+ --network-template "${TEMPLATE}" \
+ --network-token "${TOKEN}" \
+ --algod-port "${ALGOD_PORT}" \
+ --kmd-port "${KMD_PORT}" \
+ --bootstrap-url "${BOOTSTRAP_URL}" \
+ --genesis-file "/opt/node/${GENESIS_FILE}"
+
+ENV PATH="$BIN_DIR:${PATH}"
+WORKDIR $ALGORAND_DATA
+
+# Start algod
+ENTRYPOINT [ "/sbin/tini", "--" ]
+COPY supervisord.conf /etc/supervisord.conf
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

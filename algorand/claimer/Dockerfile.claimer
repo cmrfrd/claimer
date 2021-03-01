@@ -1,0 +1,29 @@
+FROM golang:1.14-alpine as builder
+
+ENV GO111MODULE=on
+ADD algorand-claimer /algorand-claimer
+WORKDIR /algorand-claimer
+RUN go build
+
+FROM golang:1.14-alpine
+
+## Install base libs
+RUN apk update && \
+    apk add bash util-linux curl jq tini --no-cache && \
+    rm -f /var/cache/apk/*
+
+## Add claimer unpriv user
+RUN addgroup -g 1000 -S claimer && \
+    adduser -u 1000 -S claimer -G claimer
+
+## permit claimer to use scripts
+COPY --from=builder /algorand-claimer/algorand-claimer /
+COPY start.sh /
+RUN chown claimer:claimer /start.sh /algorand-claimer
+
+## Use newly created system user
+USER claimer
+
+## Run
+ENTRYPOINT [ "/sbin/tini", "--" ]
+CMD [ "sh", "-c", "start.sh" ]
